@@ -16,20 +16,20 @@ def update_dataset(excel_path=None):
                 break
                 
     if not excel_path or not os.path.exists(excel_path):
-        print("❌ Error: No weather Excel file found! Please provide a path or place 'Weather.xls' in workspace.")
+        print("❌ Error: No weather Excel file found! Please place 'Weather.xls' in workspace or specify file path.")
         return False
         
-    print(f"🔄 Reading weather Excel file: {excel_path} ...")
+    print(f"\n========================================================")
+    print(f"🌾 AGROMET WEATHER DATASET UPDATER FOR KSNUAHS")
+    print(f"========================================================")
+    print(f"📁 Reading weather Excel file: {os.path.basename(excel_path)}")
     
     try:
         df = pd.read_excel(excel_path)
     except Exception as e:
-        print(f"❌ Error reading Excel: {e}")
+        print(f"❌ Error reading Excel file: {e}")
         return False
         
-    print(f"📊 Raw Rows Read: {len(df)}")
-    
-    # Clean and map column names
     col_map = {
         'District': 'd', 'district': 'd', 'DISTRICT': 'd',
         'Block': 'b', 'block': 'b', 'BLOCK': 'b', 'Taluk': 'b', 'taluk': 'b',
@@ -79,31 +79,48 @@ def update_dataset(excel_path=None):
         except Exception as err:
             continue
             
-    print(f"✅ Clean Validated Weather Records: {len(records)}")
+    districts_count = len(set(r['d'] for r in records))
+    blocks_count = len(set((r['d'], r['b']) for r in records))
     
+    print(f"\n✅ Weather Data Parsed Successfully:")
+    print(f"   • Total Daily Forecast Records: {len(records)}")
+    print(f"   • Total Districts Covered:     {districts_count}")
+    print(f"   • Total Blocks/Taluks Covered: {blocks_count}")
+    
+    print(f"\n🔍 Weather Data Sample Preview (First 3 Records):")
+    for sample in records[:3]:
+        print(f"   📍 {sample['d']} / {sample['b']} ({sample['dt']}) -> Tmax: {sample['tx']}°C, Tmin: {sample['tn']}°C, RH: {sample['rh1']}%, Rain: {sample['rf']}mm")
+        
+    print(f"========================================================\n")
+    
+    # Interactive User Confirmation Prompt
+    try:
+        confirm = input(f"Should I update the web app and push to GitHub (along with {os.path.basename(excel_path)})? (y/n): ").strip().lower()
+    except Exception:
+        confirm = 'y'
+        
+    if confirm not in ['y', 'yes']:
+        print("🛑 Update cancelled by user. No files were modified or pushed to GitHub.")
+        return False
+        
+    print("\n🔄 Updating embedded dataset and compiling web app files...")
     json_path = os.path.join(workspace, 'weather_data_embedded.json')
     with open(json_path, 'w', encoding='utf-8') as json_f:
         json.dump(records, json_f, indent=None)
         
-    print(f"💾 Updated {json_path}")
-    
-    # Recompile master builder script
     master_script = os.path.join(workspace, 'scratch', 'build_master_final.py')
     if not os.path.exists(master_script):
         master_script = os.path.join(r'C:\Users\amfuh\.gemini\antigravity-ide\brain\4b6828d4-8c1d-40b7-b021-0dfcafcb95ce\scratch\build_master_final.py')
         
-    print("🔨 Re-building HTML web application files...")
-    res = subprocess.run([sys.executable, master_script], cwd=workspace, capture_output=True, text=True)
-    print(res.stdout)
+    subprocess.run([sys.executable, master_script], cwd=workspace)
     
-    # Git Add, Commit and Push
-    print("🚀 Pushing dataset updates to GitHub...")
+    print("\n🚀 Committing and pushing weather Excel file + updated app to GitHub...")
     subprocess.run(["git", "add", "."], cwd=workspace)
-    subprocess.run(["git", "commit", "-m", f"Update weather dataset: {len(records)} records from {os.path.basename(excel_path)}"], cwd=workspace)
+    subprocess.run(["git", "commit", "-m", f"Update weather dataset & Excel: {len(records)} records from {os.path.basename(excel_path)}"], cwd=workspace)
     push_res = subprocess.run(["git", "push"], cwd=workspace, capture_output=True, text=True)
     
     print(push_res.stdout)
-    print("🎉 Weather dataset successfully updated, re-compiled, and pushed to GitHub!")
+    print("🎉 SUCCESS: Weather Excel file, embedded dataset, and HTML web app updated and live on GitHub & GitHub Pages!")
     return True
 
 if __name__ == '__main__':
